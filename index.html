@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f7f7f7">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="座席表④">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <title>座席区画④</title>
+  <style>
+    :root { color-scheme:light; font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; padding: max(16px,env(safe-area-inset-top)) 12px max(8px,env(safe-area-inset-bottom)); background:#f5f5f5; color:#222; }
+    main { max-width:760px; margin:0 auto; }
+    h1 { display:flex; align-items:baseline; gap:9px; font-size:22px; margin:8px 0 10px; }
+    .seat-total { font-size:13px; font-weight:600; color:#777; } 
+    .stats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-bottom:4px; }
+    .stat { background:white; border:1px solid #ddd; border-radius:10px; padding:4px 6px; min-height:58px; text-align:center; }
+    .stat:not(.used-stat) { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; }
+    .stat:not(.used-stat) .num { line-height:1; margin:0; }
+    .stat:not(.used-stat) .label { line-height:1.2; }
+    .stat:not(.used-stat) .stat-label-row { min-height:0; }
+    .used-stat { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; cursor:pointer; touch-action:manipulation; user-select:none; -webkit-tap-highlight-color:transparent; }
+    .used-stat:active { background:#f0f0f0; }
+    .used-stat.unlocked { background:#ffdc32; border-color:#d0a900; }
+    .used-stat.unlocked:active { background:#f3cf25; }
+    .used-stat:focus-visible { outline:2px solid #2563eb; outline-offset:2px; }
+    .num { display:block; font-size:25px; font-weight:750; font-variant-numeric:tabular-nums; }
+    .used-stat .num { display:block; line-height:1; }
+    .label { color:#666; font-size:12px; }
+    button { font:inherit; cursor:pointer; border:1px solid #aaa; border-radius:10px; padding:11px 14px; background:white; color:#222; }
+    .hint { font-size:12px; color:#666; margin:8px 0 12px; }
+    .stat-label-row { display:flex; justify-content:center; align-items:center; gap:6px; min-height:17px; }
+    .used-stat .stat-label-row { display:flex; justify-content:center; min-height:0; }
+    .lock-icon { position:absolute; left:8px; top:50%; transform:translateY(-50%); font-size:16px; line-height:1; }
+    .seat-wrap { overflow-x:auto; padding:0 0 4px; }
+    .seat-grid { min-width:350px; display:grid; grid-template-columns:26px repeat(8,minmax(0,1fr)); gap:4px; }
+    .colhead,.rowhead { display:flex; justify-content:center; align-items:center; color:#555; font-size:12px; min-height:24px; }
+    .seat { min-width:0; min-height:38px; padding:4px 0; border:1px solid #aaa; border-radius:6px; background:#fff; font-size:12px; font-weight:650; touch-action:manipulation; }
+    .seat.used { background:#ffdc32; border-color:#d0a900; }
+    .seat.blocked { background:#222; border-color:#222; cursor:default; }
+    .legend { display:flex; flex-wrap:wrap; gap:16px; align-items:center; margin:12px 0 16px; font-size:12px; color:#555; }
+    .swatch { display:inline-block; width:14px; height:14px; border:1px solid #aaa; border-radius:3px; vertical-align:-3px; margin-right:5px; }
+    .actions { display:flex; justify-content:flex-end; }
+    .reset { font-size:13px; }
+    .note { margin-top:16px; font-size:11px; color:#777; line-height:1.5; }
+    .pages { display:flex; gap:8px; margin:0 0 14px; }
+    .page { flex:1; font-weight:700; }
+    .page.active { background:#222; color:#fff; border-color:#222; }
+    .panel[hidden] { display:none; }
+    .attendance-card { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:0 0 32px; }
+    .attendance-stat { background:#fff; border:1px solid #ddd; border-radius:10px; padding:4px 6px; min-height:58px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; text-align:center; }
+    .attendance-stat .num { display:block; font-size:25px; line-height:1; margin:0; }
+    .attendance-stat .label { display:block; font-size:12px; line-height:1.2; }
+    .counter-area { min-height:54vh; display:flex; flex-direction:column; gap:10px; }
+    .count-button { flex:1; min-height:280px; width:100%; border:0; border-radius:20px; background:#2563eb; color:white; font-size:clamp(30px,8vw,42px); font-weight:800; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; box-shadow:none; touch-action:manipulation; }
+    .count-button:active { transform:translateY(2px); box-shadow:none; }
+    .count-button:disabled { opacity:.45; box-shadow:none; }
+    .count-sub { font-size:15px; font-weight:500; }
+    .counter-actions { display:flex; gap:8px; }
+    .counter-actions button { flex:1; min-height:48px; font-weight:650; }
+    @media (min-width:600px) { .seat { min-height:44px; font-size:14px; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>座席区画④ <span class="seat-total">126席</span></h1>
+  <nav class="pages" aria-label="画面切り替え">
+    <button class="page active" id="seatPageButton" type="button" aria-pressed="true">座席表</button>
+    <button class="page" id="attendancePageButton" type="button" aria-pressed="false">カウント</button>
+  </nav>
+
+  <section class="panel" id="seatPanel">
+    <section class="stats" aria-label="座席集計">
+      <div class="stat used-stat" id="seatLock" role="button" tabindex="0" aria-pressed="true" aria-label="座席ロック中。タップしてロック解除">
+        <span class="num" id="used">0</span><div class="stat-label-row"><span class="label">使用</span><span class="lock-icon" aria-hidden="true">🔒</span></div>
+      </div>
+      <div class="stat"><span class="num" id="empty">126</span><div class="stat-label-row"><span class="label">空席</span></div></div>
+    </section>
+    <div class="seat-wrap"><div class="seat-grid" id="grid" aria-label="座席一覧"></div></div>
+    <div class="legend">
+      <span><i class="swatch" style="background:white"></i>空席</span>
+      <span><i class="swatch" style="background:#ffdc32;border-color:#d0a900"></i>使用</span>
+      <span><i class="swatch" style="background:#222;border-color:#222"></i>使用不可</span>
+    </div>
+    <div class="actions"><button class="reset" id="reset" type="button">全て空席に戻す</button></div>
+  </section>
+
+  <section class="panel" id="attendancePanel" hidden>
+    <div class="attendance-card" aria-live="polite">
+      <div class="attendance-stat">
+        <span class="num" id="attendeeCount">126</span>
+        <span class="label">出席人数</span>
+      </div>
+      <div class="attendance-stat">
+        <span class="num" id="vacancyCount">0</span>
+        <span class="label">空席</span>
+      </div>
+    </div>
+    <div class="counter-area">
+      <button class="count-button" id="countVacancy" type="button">空席カウント</button>
+      <div class="counter-actions">
+        <button id="undoVacancy" type="button">1つ戻す</button>
+        <button id="resetVacancy" type="button">リセット</button>
+      </div>
+    </div>
+  </section>
+  <p class="note">座席の状態と空席カウントはこのiPhoneのブラウザ内に保存されます。Safariの履歴・Webサイトデータを消去すると保存内容も消える場合があります。</p>
+</main>
+<script>
+(() => {
+  const ROWS = 16, FIRST_SEAT = 24, COLS = 8;
+  const BLOCKED = new Set(["4-27", "4-28"]);
+  const STORAGE_KEY = "seatmap-kaku4-v1";
+  const VACANCY_KEY = "seatmap-kaku4-vacancy-v1";
+  let vacancyCount = 0;
+  let isLocked = true;
+  let used = new Set();
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    if (Array.isArray(saved)) used = new Set(saved.filter(k => typeof k === "string" && !BLOCKED.has(k)));
+  } catch (_) {}
+  try {
+    const savedVacancy = Number(localStorage.getItem(VACANCY_KEY) || 0);
+    vacancyCount = Number.isFinite(savedVacancy) ? Math.max(0, Math.min(126, Math.floor(savedVacancy))) : 0;
+  } catch (_) {}
+  const grid = document.getElementById("grid");
+  const total = ROWS * COLS - BLOCKED.size;
+  function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify([...used])); } catch (_) {} }
+  function saveVacancy() { try { localStorage.setItem(VACANCY_KEY, String(vacancyCount)); } catch (_) {} }
+  function updateVacancy() {
+    document.getElementById("vacancyCount").textContent = vacancyCount;
+    document.getElementById("attendeeCount").textContent = 126 - vacancyCount;
+    document.getElementById("countVacancy").disabled = vacancyCount >= 126;
+    document.getElementById("undoVacancy").disabled = vacancyCount <= 0;
+  }
+  function showPage(page) {
+    const attendance = page === "attendance";
+    document.getElementById("seatPanel").hidden = attendance;
+    document.getElementById("attendancePanel").hidden = !attendance;
+    document.getElementById("seatPageButton").classList.toggle("active", !attendance);
+    document.getElementById("attendancePageButton").classList.toggle("active", attendance);
+    document.getElementById("seatPageButton").setAttribute("aria-pressed", String(!attendance));
+    document.getElementById("attendancePageButton").setAttribute("aria-pressed", String(attendance));
+  }
+  document.getElementById("seatPageButton").addEventListener("click", () => showPage("seat"));
+  document.getElementById("attendancePageButton").addEventListener("click", () => showPage("attendance"));
+  document.getElementById("countVacancy").addEventListener("click", () => {
+    if (vacancyCount < 126) { vacancyCount++; saveVacancy(); updateVacancy(); }
+  });
+  document.getElementById("undoVacancy").addEventListener("click", () => {
+    if (vacancyCount > 0) { vacancyCount--; saveVacancy(); updateVacancy(); }
+  });
+  document.getElementById("resetVacancy").addEventListener("click", () => {
+    if (!confirm("空席カウントを0に戻しますか？")) return;
+    vacancyCount = 0; saveVacancy(); updateVacancy();
+  });
+  function updateStats() {
+    document.getElementById("used").textContent = used.size;
+    document.getElementById("empty").textContent = total - used.size;
+  }
+  function updateLock() {
+    const area = document.getElementById("seatLock");
+    area.querySelector(".lock-icon").textContent = isLocked ? "🔒" : "🔓";
+    area.classList.toggle("unlocked", !isLocked);
+    area.setAttribute("aria-pressed", String(isLocked));
+    area.setAttribute("aria-label", isLocked ? "座席ロック中。タップしてロック解除" : "座席ロック解除中。タップしてロック");
+    document.getElementById("reset").disabled = isLocked;
+    document.getElementById("reset").style.opacity = isLocked ? ".45" : "1";
+  }
+  const lockArea = document.getElementById("seatLock");
+  function toggleLock() { isLocked = !isLocked; updateLock(); }
+  lockArea.addEventListener("click", toggleLock);
+  lockArea.addEventListener("keydown", event => {
+    if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggleLock(); }
+  });
+  const blank = document.createElement("div");
+  grid.appendChild(blank);
+  for (let c=0;c<COLS;c++) {
+    const h=document.createElement("div"); h.className="colhead"; grid.appendChild(h);
+  }
+  for (let r=1;r<=ROWS;r++) {
+    const rh=document.createElement("div"); rh.className="rowhead"; rh.textContent=r; grid.appendChild(rh);
+    for (let c=0;c<COLS;c++) {
+      const seatNo=FIRST_SEAT+c, key=`${r}-${seatNo}`;
+      const b=document.createElement("button");
+      b.type="button"; b.className="seat"; b.setAttribute("aria-label",`第${r}列 ${seatNo}番`);
+      if (BLOCKED.has(key)) {
+        b.classList.add("blocked"); b.disabled=true; b.setAttribute("aria-label",`第${r}列 ${seatNo}番 使用不可`);
+      } else {
+        b.textContent=seatNo;
+        b.addEventListener("click", () => {
+          if (isLocked) return;
+          if (used.has(key)) used.delete(key); else used.add(key);
+          save(); renderSeat(b,key); updateStats();
+        });
+        renderSeat(b,key);
+      }
+      grid.appendChild(b);
+    }
+  }
+  function renderSeat(button,key) {
+    const isUsed=used.has(key);
+    button.classList.toggle("used",isUsed);
+    button.setAttribute("aria-pressed",String(isUsed));
+  }
+  document.getElementById("reset").addEventListener("click", () => {
+    if (isLocked) return;
+    if (!confirm("全ての座席を空席に戻しますか？")) return;
+    used.clear(); save();
+    document.querySelectorAll(".seat:not(.blocked)").forEach(b => b.classList.remove("used"));
+    document.querySelectorAll(".seat:not(.blocked)").forEach(b => b.setAttribute("aria-pressed","false"));
+    updateStats();
+  });
+  updateStats();
+  updateLock();
+  updateVacancy();
+  if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+})();
+</script>
+</body>
+</html>
